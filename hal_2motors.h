@@ -1829,6 +1829,12 @@ void HAL_readDrvData(HAL_Handle_mtr handle, DRV_SPI_8305_Vars_t *Spi_8305_Vars);
 void HAL_setupDrvSpi(HAL_Handle_mtr handle, DRV_SPI_8305_Vars_t *Spi_8305_Vars);
 
 
+//! \brief     Sets up the SCI interface for the driver
+//! \param[in] handle         The hardware abstraction layer (HAL) handle
+void HAL_setupSCI(HAL_Handle handle);
+
+void SCI_write_char(SCI_Handle sciHandle,char a);
+void SCI_write_str(SCI_Handle sciHandle, char* str);
 
 #ifdef __cplusplus
 }

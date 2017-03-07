@@ -538,6 +538,7 @@ void main(void) {
 
 	// Begin the background loop
 	for (;;) {
+		SCI_write_char(halHandle, 'a');
 		// Waiting for enable system flag to be set
 		while (!(gSystemVars.Flag_enableSystem))
 			;

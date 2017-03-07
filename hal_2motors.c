@@ -706,6 +706,8 @@ HAL_Handle HAL_init(void *pMemory,const size_t numBytes)
   obj->timerHandle[1] = TIMER_init((void *)TIMER1_BASE_ADDR,sizeof(TIMER_Obj));
   obj->timerHandle[2] = TIMER_init((void *)TIMER2_BASE_ADDR,sizeof(TIMER_Obj));
 
+
+  obj->sciBHandle = SCI_init((void *)SCIB_BASE_ADDR,sizeof(SCI_Obj));
   return(handle);
 } // end of HAL_init() function
 
@@ -850,6 +852,8 @@ void HAL_setParams(HAL_Handle handle,const USER_Params *pUserParams)
 
   // setup the spiB for DRV8305(s)
   HAL_setupSpiB(handle);
+
+  HAL_setupSCI(handle);
 
   // setup the PWM DACs
   HAL_setupPwmDacs(handle);
@@ -1371,8 +1375,11 @@ void HAL_setupGpios(HAL_Handle handle)
 
   // UARTB RX
   GPIO_setMode(obj->gpioHandle,GPIO_Number_23,GPIO_23_Mode_SCIRXDB);
+  GPIO_setPullup(obj->gpioHandle, GPIO_Number_23, GPIO_Pullup_Enable);
+
   // UARTB TX
   GPIO_setMode(obj->gpioHandle,GPIO_Number_22,GPIO_22_Mode_SCITXDB);
+  GPIO_setPullup(obj->gpioHandle, GPIO_Number_22, GPIO_Pullup_Enable);
 
   // Set Qualification Period for GPIO16-23, 22*2*(1/90MHz) = 0.48us
   GPIO_setQualificationPeriod(obj->gpioHandle,GPIO_Number_16,22);
@@ -1542,6 +1549,8 @@ void HAL_setupGpios(HAL_Handle handle)
 }  // end of HAL_setupGpios() function
 
 
+
+
 void HAL_setupPie(HAL_Handle handle)
 {
   HAL_Obj *obj = (HAL_Obj *)handle;
@@ -1606,6 +1615,8 @@ void HAL_setupPeripheralClks(HAL_Handle handle)
   CLK_enableSpiaClock(obj->clkHandle);
   CLK_enableSpibClock(obj->clkHandle);
   
+  CLK_enableScibClock(obj->clkHandle); // SCI B clock
+
   CLK_enableTbClockSync(obj->clkHandle);
 
   return;
@@ -2243,4 +2254,57 @@ void HAL_setDacParameters(HAL_Handle handle, HAL_DacData_t *pDacData)
 	return;
 }	//end of HAL_setDacParameters() function
 
+
+// function written by Maria Todorova on TI e2e forums
+// https://e2e.ti.com/support/microcontrollers/c2000/f/902/p/334989/1168654
+
+void HAL_setupSCI(HAL_Handle handle) {
+	HAL_Obj *obj = (HAL_Obj *) handle;
+	// Initialize all SCI registers based on your requirement. This is only example.
+
+	// SCI stop bit, parity, loopback, char bits, idle/address mode (SCICCR = 0x07)
+	SCI_setNumStopBits(obj->sciBHandle, SCI_NumStopBits_One);    // SCICCR bit 7
+	SCI_setParity(obj->sciBHandle, SCI_Parity_Odd);                          // SCICCR bit 6
+	SCI_disableParity(obj->sciBHandle);                                               // SCICCR bit 5
+	SCI_disableLoopBack(obj->sciBHandle);                                        // SCICCR bit 4
+	SCI_setMode(obj->sciBHandle, SCI_Mode_IdleLine);                     // SCICCR bit 3
+	SCI_setCharLength(obj->sciBHandle, SCI_CharLength_8_Bits);   // SCICCR bit 0-2
+
+	// TX enable, RX enable, RX ERR INT enable, SLEEP, TXWAKE (SCICTL1 = 0x03)
+	SCI_disableRxErrorInt(obj->sciBHandle);                        // SCICTL1 bit 6
+	SCI_disable(obj->sciBHandle);                                        // SCICTL1 bit 5
+	SCI_disableTxWake(obj->sciBHandle);                           // SCICTL1 bit 3
+	SCI_disableSleep(obj->sciBHandle);                              // SCICTL1 bit 2
+	SCI_enableTx(obj->sciBHandle);                                    // SCICTL1 bit 1
+	SCI_enableRx(obj->sciBHandle);                                    // SCICTL1 bit 0
+
+	// TXINT enable, RXINT enable, TXEMPTY, TXRDY (SCICTL2 = 0x03)
+	SCI_enableRxInt(obj->sciBHandle);                            // SCICTL2 bit 1
+	SCI_disableTxInt(obj->sciBHandle);                            // SCICTL2 bit 0
+
+	// SCIH-SCIL BAUD - SCI_BAUD = (LSPCLK/(SCI_BRR*8)) - 1
+	//SCI_setBaudRate(obj->sciBHandle, SCI_BaudRate_19_2_kBaud);
+	SCI_setBaudRate(obj->sciBHandle, (SCI_BaudRate_e)(((USER_SYSTEM_FREQ_MHz_COM * 1E6)/(38400*8)) - 1));
+	// Reset SCI
+	SCI_enable(obj->sciBHandle);
+
+	//PIE_enableSciInt(obj->pieHandle, SCI_RXA);                 // enable SCI interrupt
+	//CPU_enableInt(obj->cpuHandle, CPU_IntNumber_9);    // enable CPU interrupt
+}
+
+void SCI_write_char(SCI_Handle sciHandle,char a)
+{
+    SCI_Obj *sci = (SCI_Obj *)sciHandle;
+
+    while(SCI_getTxFifoStatus(sci) == SCI_FifoStatus_4_Words) { }
+    SCI_write(sci, a);
+}
+
+void SCI_write_str(SCI_Handle sciHandle, char* str)
+{
+    while(*str != 0)
+    {
+        SCI_write_char(sciHandle, *str++);
+    }
+}
 // end of file

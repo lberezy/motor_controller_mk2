@@ -167,6 +167,11 @@
 			<locationURI>MW_INSTALL_DIR/sw/drivers/gpio/src/32b/f28x/f2806x/gpio.c</locationURI>
 		</link>
 		<link>
+			<name>i2c.h</name>
+			<type>1</type>
+			<locationURI>MW_INSTALL_DIR/sw/drivers/i2c/src/32b/f28x/f2806x/i2c.h</locationURI>
+		</link>
+		<link>
 			<name>ipark.c</name>
 			<type>1</type>
 			<locationURI>MW_INSTALL_DIR/sw/modules/ipark/src/32b/ipark.c</locationURI>
@@ -210,6 +215,11 @@
 			<name>qep.c</name>
 			<type>1</type>
 			<locationURI>MW_INSTALL_DIR/sw/drivers/qep/src/32b/f28x/f2806x/qep.c</locationURI>
+		</link>
+		<link>
+			<name>sci.c</name>
+			<type>1</type>
+			<locationURI>MW_INSTALL_DIR/sw/drivers/sci/src/32b/f28x/f2806x/sci.c</locationURI>
 		</link>
 		<link>
 			<name>spi.c</name>
