@@ -45,7 +45,7 @@
 #include "sw/drivers/flash/src/32b/f28x/f2806x/flash.h"
 #include "sw/drivers/gpio/src/32b/f28x/f2806x/gpio.h"
 #include "sw/drivers/osc/src/32b/f28x/f2806x/osc.h"
-#include "sw/drivers/pie/src/32b/f28x/f2806x/pie.h"
+//#include "sw/drivers/pie/src/32b/f28x/f2806x/pie.h"
 #include "sw/drivers/pll/src/32b/f28x/f2806x/pll.h"
 #include "sw/drivers/pwm/src/32b/f28x/f2806x/pwm.h"
 #include "sw/drivers/pwmdac/src/32b/f28x/f2806x/pwmdac.h"
@@ -55,8 +55,12 @@
 #include "sw/drivers/wdog/src/32b/f28x/f2806x/wdog.h"
 #include "sw/drivers/sci/src/32b/f28x/f2806x/sci.h"
 //#include "sw/drivers/drvic/drv8305/src/32b/f28x/f2806x/drv8305.h"
+
 // use customised driver
 #include "drv8305.h"
+#include "i2c.h"
+#include "pie.h"
+#include "mpu6050.h"
 
 #ifdef QEP
 #include "sw/drivers/qep/src/32b/f28x/f2806x/qep.h"
@@ -186,6 +190,12 @@ typedef struct _HAL_Obj_
 //  DRV8305_Obj    drv8305;         //!< the drv8305 interface object
 
   SCI_Handle    sciBHandle;        //!< the SCI B handle
+
+  I2C_Handle 	i2cAHandle;			//!< the I2C A Handle
+  I2C_Handle 	i2cBHandle;			//!< the I2C B Handle
+
+  MPU6050_Handle mpu6050Handle; //!< the IMU handle
+  MPU6050_Obj mpu6050Obj;
 
 } HAL_Obj;
 

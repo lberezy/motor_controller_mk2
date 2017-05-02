@@ -52,6 +52,8 @@
 #include "sw/modules/svgen/src/32b/svgen_current.h"
 #include "sw/modules/enc/src/32b/enc.h"
 
+#include <stdio.h>
+#include <string.h>
 //!
 //!
 //! \defgroup HAL HAL
@@ -177,6 +179,8 @@ extern interrupt void motor_ISR(void);
 extern interrupt void motor1_ISR(void);
 extern interrupt void motor2_ISR(void);
 #endif
+
+extern interrupt void i2c_ISR(void);
 
 // **************************************************************************
 // the function prototypes
@@ -549,6 +553,8 @@ static inline void HAL_initIntVectorTable(HAL_Handle handle)
 
 
   ENABLE_PROTECTED_REGISTER_WRITE_MODE;
+
+  pie->I2CINT1A = &i2c_ISR; // I2C Interrupt
 
   #ifdef _SINGLE_ISR_EN_
   pie->ADCINT1 = &motor_ISR;
@@ -1421,6 +1427,14 @@ extern void HAL_setupSpiA(HAL_Handle handle);
 //! \param[in] handle  The hardware abstraction layer (HAL) handle
 extern void HAL_setupSpiB(HAL_Handle handle);
 
+//! \brief     Sets up the i2cA peripheral
+//! \param[in] handle  The hardware abstraction layer (HAL) handle
+extern void HAL_setupI2cA(HAL_Handle handle);
+
+//! \brief     Sets up the IMU
+//! \param[in] handle  The hardware abstraction layer (HAL) handle
+extern void HAL_setupIMU(HAL_Handle handle);
+
 
 //! \brief     Sets up the timers
 //! \param[in] handle          The hardware abstraction layer (HAL) handle
@@ -1835,6 +1849,30 @@ void HAL_setupSCI(HAL_Handle handle);
 
 void SCI_write_char(SCI_Handle sciHandle,char a);
 void SCI_write_str(SCI_Handle sciHandle, char* str);
+
+extern interrupt void i2c_ISR(void);
+
+//! \brief Acknowledges an interrupt from i2c so that another i2c interrupt can
+//! happen again.
+//! \param[in] handle The hardware abstraction layer (HAL) handle
+static inline void HAL_acqI2cInt(HAL_Handle handle)
+{
+HAL_Obj *obj = (HAL_Obj *)handle;
+
+//I2C_clearTxFifoInt(obj->i2cAHandle);
+//I2C_clearRxFifoInt(obj->i2cAHandle);
+//I2C_clearRRDYflag(obj->i2cAHandle);
+// Acknowledge interrupt from PIE group 8
+PIE_clearInt(obj->pieHandle,PIE_GroupNumber_8);
+return;
+
+}
+#define UART_PRINTF
+
+#ifdef UART_PRINTF
+int fputc(int _c, register FILE *_fp);
+int fputs(const char *_ptr, register FILE *_fp);
+#endif
 
 #ifdef __cplusplus
 }

@@ -347,6 +347,7 @@ extern volatile SYSTEM_Vars_t gSystemVars;
 //!
 interrupt void motor1_ISR(void);
 interrupt void motor2_ISR(void);
+interrupt void i2c_ISR(void);
 
 void pidSetup(HAL_MtrSelect_e mtrNum);
 

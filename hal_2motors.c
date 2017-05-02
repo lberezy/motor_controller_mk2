@@ -519,7 +519,6 @@ void HAL_enableDebugInt(HAL_Handle handle)
 void HAL_enableDrv(HAL_Handle_mtr handleMtr)
 {
   HAL_Obj_mtr *obj = (HAL_Obj_mtr *)handleMtr;
-
   DRV8305_enable(obj->drv8305Handle);
 
   return;
@@ -706,8 +705,16 @@ HAL_Handle HAL_init(void *pMemory,const size_t numBytes)
   obj->timerHandle[1] = TIMER_init((void *)TIMER1_BASE_ADDR,sizeof(TIMER_Obj));
   obj->timerHandle[2] = TIMER_init((void *)TIMER2_BASE_ADDR,sizeof(TIMER_Obj));
 
-
+  // initialise SCI handle
   obj->sciBHandle = SCI_init((void *)SCIB_BASE_ADDR,sizeof(SCI_Obj));
+
+  // initialise i2c handles
+  obj->i2cAHandle = I2C_init((void *)I2CA_BASE_ADDR,sizeof(I2C_Obj));
+  //obj->i2cBHandle = I2C_init((void *)I2CB_BASE_ADDR,sizeof(I2C_Obj));
+
+  // initialise the IMU handle
+  obj->mpu6050Handle = MPU6050_init(&obj->mpu6050Obj, sizeof(obj->mpu6050Obj));
+
   return(handle);
 } // end of HAL_init() function
 
@@ -777,7 +784,7 @@ HAL_Handle_mtr HAL_init_mtr(void *pMemory,const size_t numBytes,const HAL_MtrSel
   // initialize drv8305 interface
   obj->drv8305Handle = DRV8305_init(&obj->drv8305,sizeof(obj->drv8305));
 
-  // initialize QEP driver
+  // initialize QEP driverf
 #ifdef QEP
   if(mtrNum == HAL_MTR1)
   {
@@ -849,7 +856,6 @@ void HAL_setParams(HAL_Handle handle,const USER_Params *pUserParams)
   // setup the spiA for Ext. SPI
   HAL_setupSpiA(handle);
 
-
   // setup the spiB for DRV8305(s)
   HAL_setupSpiB(handle);
 
@@ -861,6 +867,11 @@ void HAL_setParams(HAL_Handle handle,const USER_Params *pUserParams)
   // setup the timers
   HAL_setupTimers(handle,
                   (float_t)pUserParams->systemFreq_MHz);
+
+  HAL_setupI2cA(handle);
+  //HAL_setupI2cB(handle);
+
+  HAL_setupIMU(handle);
 
 
  return;
@@ -1468,11 +1479,20 @@ void HAL_setupGpios(HAL_Handle handle)
   GPIO_setMode(obj->gpioHandle,GPIO_Number_25,GPIO_25_Mode_GeneralPurpose);
   GPIO_setDirection(obj->gpioHandle,GPIO_Number_25,GPIO_Direction_Input);
 
-  // I2C Data
+  // I2CA Data
   GPIO_setMode(obj->gpioHandle,GPIO_Number_28,GPIO_28_Mode_SDDA);
+  //GPIO_setMode(obj->gpioHandle,GPIO_Number_28,GPIO_28_Mode_GeneralPurpose);
+  //GPIO_setDirection(obj->gpioHandle,GPIO_Number_28,GPIO_Direction_Output);
+  GPIO_setPullup(obj->gpioHandle, GPIO_Number_28, GPIO_Pullup_Enable);
+  GPIO_setQualification(obj->gpioHandle, GPIO_Number_28, GPIO_Qual_Sync);
 
-  // I2C Clock
+  // I2CA Clock
   GPIO_setMode(obj->gpioHandle,GPIO_Number_29,GPIO_29_Mode_SCLA);
+  //GPIO_setMode(obj->gpioHandle,GPIO_Number_29,GPIO_29_Mode_GeneralPurpose);
+  //GPIO_setDirection(obj->gpioHandle,GPIO_Number_29,GPIO_Direction_Output);
+  GPIO_setPullup(obj->gpioHandle, GPIO_Number_29, GPIO_Pullup_Enable);
+  GPIO_setQualification(obj->gpioHandle, GPIO_Number_29, GPIO_Qual_Sync);
+
 
   // VUSB_SENSE
   GPIO_setMode(obj->gpioHandle,GPIO_Number_31,GPIO_31_Mode_GeneralPurpose);
@@ -1614,8 +1634,6 @@ void HAL_setupPeripheralClks(HAL_Handle handle)
 
   CLK_enableSpiaClock(obj->clkHandle);
   CLK_enableSpibClock(obj->clkHandle);
-  
-  CLK_enableScibClock(obj->clkHandle); // SCI B clock
 
   CLK_enableTbClockSync(obj->clkHandle);
 
@@ -2255,8 +2273,32 @@ void HAL_setDacParameters(HAL_Handle handle, HAL_DacData_t *pDacData)
 }	//end of HAL_setDacParameters() function
 
 
+
+
+#ifdef UART_PRINTF
+int fputc(int _c, register FILE *_fp) {
+	// get hard coded SCI handle to peripheral SCIB
+	SCI_Handle sciHandle = (SCI_Handle)SCIB_BASE_ADDR;
+	SCI_write_char(sciHandle, _c);
+	return((unsigned char) _c);
+}
+
+int fputs(const char *_ptr, register FILE *_fp) {
+	// get hard coded SCI handle to peripheral SCIB
+	SCI_Handle sciHandle = (SCI_Handle)SCIB_BASE_ADDR;
+	unsigned int i, len;
+	len = strlen(_ptr);
+	for(i=0 ; i<len ; i++) {
+		SCI_write_char(sciHandle, (unsigned char) _ptr[i]);
+	}
+	return len;
+}
+#endif
+
 // function written by Maria Todorova on TI e2e forums
 // https://e2e.ti.com/support/microcontrollers/c2000/f/902/p/334989/1168654
+
+
 
 void HAL_setupSCI(HAL_Handle handle) {
 	HAL_Obj *obj = (HAL_Obj *) handle;
@@ -2264,22 +2306,26 @@ void HAL_setupSCI(HAL_Handle handle) {
 
 	// SCI stop bit, parity, loopback, char bits, idle/address mode (SCICCR = 0x07)
 	SCI_setNumStopBits(obj->sciBHandle, SCI_NumStopBits_One);    // SCICCR bit 7
-	SCI_setParity(obj->sciBHandle, SCI_Parity_Odd);                          // SCICCR bit 6
+	//SCI_setParity(obj->sciBHandle, SCI_Parity_Odd);                          // SCICCR bit 6
 	SCI_disableParity(obj->sciBHandle);                                               // SCICCR bit 5
 	SCI_disableLoopBack(obj->sciBHandle);                                        // SCICCR bit 4
 	SCI_setMode(obj->sciBHandle, SCI_Mode_IdleLine);                     // SCICCR bit 3
 	SCI_setCharLength(obj->sciBHandle, SCI_CharLength_8_Bits);   // SCICCR bit 0-2
-
+	//SCI_enableAutoBaudAlign(obj->sciBHandle);
 	// TX enable, RX enable, RX ERR INT enable, SLEEP, TXWAKE (SCICTL1 = 0x03)
 	SCI_disableRxErrorInt(obj->sciBHandle);                        // SCICTL1 bit 6
 	SCI_disable(obj->sciBHandle);                                        // SCICTL1 bit 5
 	SCI_disableTxWake(obj->sciBHandle);                           // SCICTL1 bit 3
 	SCI_disableSleep(obj->sciBHandle);                              // SCICTL1 bit 2
+	SCI_enableRxFifo(obj->sciBHandle);
+	SCI_enableTxFifo(obj->sciBHandle);
+    SCI_enableTxFifoEnh(obj->sciBHandle);
 	SCI_enableTx(obj->sciBHandle);                                    // SCICTL1 bit 1
 	SCI_enableRx(obj->sciBHandle);                                    // SCICTL1 bit 0
 
+
 	// TXINT enable, RXINT enable, TXEMPTY, TXRDY (SCICTL2 = 0x03)
-	SCI_enableRxInt(obj->sciBHandle);                            // SCICTL2 bit 1
+	SCI_disableRxInt(obj->sciBHandle);                            // SCICTL2 bit 1
 	SCI_disableTxInt(obj->sciBHandle);                            // SCICTL2 bit 0
 
 	// SCIH-SCIL BAUD - SCI_BAUD = (LSPCLK/(SCI_BRR*8)) - 1
@@ -2296,7 +2342,7 @@ void SCI_write_char(SCI_Handle sciHandle,char a)
 {
     SCI_Obj *sci = (SCI_Obj *)sciHandle;
 
-    while(SCI_getTxFifoStatus(sci) == SCI_FifoStatus_4_Words) { }
+    while(SCI_getTxFifoStatus(sci) == SCI_FifoStatus_4_Words);
     SCI_write(sci, a);
 }
 
@@ -2307,4 +2353,50 @@ void SCI_write_str(SCI_Handle sciHandle, char* str)
         SCI_write_char(sciHandle, *str++);
     }
 }
+
+void HAL_setupIMU(HAL_Handle handle) {
+	HAL_Obj *obj = (HAL_Obj *)handle;
+
+	MPU6050_setI2CHandle(obj->mpu6050Handle, obj->i2cAHandle);
+	MPU6050_setI2CAddress(obj->mpu6050Handle, MPU6050_ADDRESS_AD0_LOW);
+	MPU6050_setup(obj->mpu6050Handle);
+}
+
+void HAL_setupI2cA(HAL_Handle handle) {
+	HAL_Obj *obj = (HAL_Obj *)handle;
+
+	I2C_resetAll(obj->i2cAHandle);
+	I2C_setupClock(obj->i2cAHandle,8,45,45); //I2C Clock module: (input [90 MHz]) /(IPSC + 1) = 10 Mhz (with IPSC = 9)
+//I2C SCK = prescaled/((ICCL+d)+(ICCH+d)) where (d = 7 if ISPSC = 0, d = 6 if IPSC = 1, 5 otherwise) -> 100 kHz SCK with ICCL=ICCH=45 (d=5)
+	I2C_setMaster(obj->i2cAHandle); //Mode Master
+	//I2C_setMasterSlaveAddr(obj->i2cAHandle,0x50);
+	//I2C_disableFifo(obj->i2cAHandle);
+
+	// enable TX FIFO
+	obj->i2cAHandle->I2CFFTX |= (I2C_I2CFFTX_FFEN_BIT | I2C_I2CFFTX_TXFFRST_BIT);
+	I2C_clearStopConditionDetection(obj->i2cAHandle);
+
+	I2C_enable(obj->i2cAHandle); //enable i2c
+
+	return;
+} // end of HAL_setupI2cA() function
+
+void HAL_enableI2cInt(HAL_Handle handle) {
+	HAL_Obj *obj = (HAL_Obj *)handle;
+
+	PIE_enableI2cInt(obj->pieHandle);
+
+	//I2C_enableInt(obj->i2cAHandle,I2C_IntEn_Arb_Lost);
+	//I2C_enableInt(obj->i2cAHandle,I2C_IntEn_NACK);
+	//I2C_enableInt(obj->i2cAHandle,I2C_IntEn_Reg_Rdy);
+	//I2C_enableInt(obj->i2cAHandle,I2C_IntEn_Rx_Rdy);
+	//I2C_enableInt(obj->i2cAHandle,I2C_IntEn_Tx_Rdy);
+	//I2C_enableInt(obj->i2cAHandle,I2C_IntEn_Stop);
+	//I2C_enableInt(obj->i2cAHandle,I2C_IntEn_Slave_Addr);
+
+	// enable the cpu interrupt for TINT8
+	//CPU_enableInt(obj->cpuHandle,CPU_IntNumber_8);
+	return;
+}
+
 // end of file
