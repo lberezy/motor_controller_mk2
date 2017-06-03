@@ -538,8 +538,8 @@ extern void I2C_clearRunFree(I2C_Handle i2cHandle);
 extern void I2C_writeData(I2C_Handle i2cHandle, uint16_t addr, uint16_t reg, uint16_t data);
 
 extern uint16_t I2C_readData(I2C_Handle i2cHandle, uint16_t addr, uint16_t reg);
-extern void I2C_readBytes(I2C_Handle i2cHandle, uint16_t addr, uint16_t reg, uint16_t num, uint16_t* data);
-
+//extern void I2C_readBytes(I2C_Handle i2cHandle, uint16_t addr, uint16_t reg, uint16_t num, uint16_t* data);
+extern int I2C_readBytes(I2C_Handle i2cHandle, uint16_t slaveaddr, uint16_t* write_data, uint16_t write_len, uint16_t* read_data, uint16_t read_len);
 
 //*****************************************************************************
 // Mark the end of the C bindings section for C++ compilers.

@@ -465,7 +465,7 @@ typedef struct _MPU6050_Obj_ *MPU6050_Handle;
 //! \return    The MPU6050 object handle
 extern MPU6050_Handle MPU6050_init(void *pMemory,const size_t numBytes);
 
-extern void DRV8305_setI2CHandle(MPU6050_Handle handle, I2C_Handle i2cHandle);
+extern void MPU6050_setI2CHandle(MPU6050_Handle handle, I2C_Handle i2cHandle);
 extern void MPU6050_setI2CAddress(MPU6050_Handle handle, MPU6050_I2C_Addr_e addr);
 
 extern void MPU6050_setup(MPU6050_Handle handle);
@@ -484,5 +484,7 @@ extern void MPU6050_enable(MPU6050_Handle handle);
 //! \brief     Enables the MPU6050
 //! \param[in] handle     The MPU6050 handle
 extern void MPU6050_testConnection(MPU6050_Handle handle);
+
+void MPU6050_getGyro_All(MPU6050_Handle handle, int16_t* data);
 
 #endif /* _MPU6050_H_ */

@@ -2358,22 +2358,22 @@ void HAL_setupIMU(HAL_Handle handle) {
 	HAL_Obj *obj = (HAL_Obj *)handle;
 
 	MPU6050_setI2CHandle(obj->mpu6050Handle, obj->i2cAHandle);
-	MPU6050_setI2CAddress(obj->mpu6050Handle, MPU6050_ADDRESS_AD0_LOW);
+	MPU6050_setI2CAddress(obj->mpu6050Handle, Addr_AD0_Low);
 	MPU6050_setup(obj->mpu6050Handle);
 }
 
 void HAL_setupI2cA(HAL_Handle handle) {
 	HAL_Obj *obj = (HAL_Obj *)handle;
 
-	I2C_resetAll(obj->i2cAHandle);
+	I2C_resetAll(obj->i2cAHandle); // should only configure clock when module is not enabled
 	I2C_setupClock(obj->i2cAHandle,8,45,45); //I2C Clock module: (input [90 MHz]) /(IPSC + 1) = 10 Mhz (with IPSC = 9)
-//I2C SCK = prescaled/((ICCL+d)+(ICCH+d)) where (d = 7 if ISPSC = 0, d = 6 if IPSC = 1, 5 otherwise) -> 100 kHz SCK with ICCL=ICCH=45 (d=5)
+//I2C SCK = prescaled/((ICCL+d)+(ICCH+d)) where (d = 7 if ISPSC = 0, d = 6 if IPSC = 1, 5 otherwise) -> 100 kHz SCK with 45 (d=5)
 	I2C_setMaster(obj->i2cAHandle); //Mode Master
 	//I2C_setMasterSlaveAddr(obj->i2cAHandle,0x50);
 	//I2C_disableFifo(obj->i2cAHandle);
 
 	// enable TX FIFO
-	obj->i2cAHandle->I2CFFTX |= (I2C_I2CFFTX_FFEN_BIT | I2C_I2CFFTX_TXFFRST_BIT);
+	//obj->i2cAHandle->I2CFFTX |= (I2C_I2CFFTX_FFEN_BIT | I2C_I2CFFTX_TXFFRST_BIT);
 	I2C_clearStopConditionDetection(obj->i2cAHandle);
 
 	I2C_enable(obj->i2cAHandle); //enable i2c

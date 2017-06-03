@@ -1090,7 +1090,7 @@ void I2C_clearStopConditionDetection(I2C_Handle i2cHandle)
 
     //i2c->I2CSTR &= (~I2C_I2CSTR_SCD_BITS);
     //asm(" nop");
-    i2c->I2CSTR |= I2C_I2CSTR_SCD_BITS;
+    i2c->I2CSTR = I2C_I2CSTR_SCD_BITS;
 
     return;
 }
@@ -1266,23 +1266,25 @@ extern uint16_t I2C_readData(I2C_Handle i2cHandle, uint16_t addr, uint16_t reg) 
 
 	// release hold on bus
 	// reset
+	i2c->I2CMDR = 0x00;
 	i2c->I2CMDR |= I2C_I2CMDR_IRS_BIT;
 
 	// busy wait on bus-busy
 	while(i2c->I2CSTR & I2C_I2CSTR_BB_BITS);
 
 	// clear stop condition bit by writing to it
-	i2c->I2CSTR |= I2C_I2CSTR_SCD_BITS;
+	i2c->I2CSTR = I2C_I2CSTR_SCD_BITS;
 	// wait on stop status to clear
 	while(i2c->I2CMDR & I2C_I2CMDR_STP_BIT);
 
 	i2c->I2CSAR = addr;
 
 	// busy wait on bus-busy
-	//while(i2c->I2CSTR & I2C_I2CSTR_BB_BITS);
+	while(i2c->I2CSTR & I2C_I2CSTR_BB_BITS){};
 
 	i2c->I2CCNT = 1; //just one byte to write
 	i2c->I2CDXR = reg;
+	// master mode (MST), transmit (TRX), send start (STT), free run (FREE),
 	i2c->I2CMDR = (I2C_I2CMDR_STT_BIT | I2C_I2CMDR_MST_BIT | I2C_I2CMDR_IRS_BIT | I2C_I2CMDR_TRX_BIT | I2C_I2CMDR_FREE_BIT);
 	// should write register on to bus in master write mode
 
@@ -1293,19 +1295,25 @@ extern uint16_t I2C_readData(I2C_Handle i2cHandle, uint16_t addr, uint16_t reg) 
 		// generate STOP condition
 		i2c->I2CMDR |= I2C_I2CMDR_STP_BIT;
 		// clear NACK
-		i2c->I2CSTR |= I2C_I2CSTR_NACK_BITS;
+		i2c->I2CSTR = I2C_I2CSTR_NACK_BITS;
 		goto error;
 	}
-	// change peripheral to master RX mode and generate stop condition
 
+	// wait for ARDY before beginning the read phase of the transaction
+	while(!(i2c->I2CSTR & I2C_I2CSTR_ARDY_BITS));
+
+
+	// change peripheral to master RX mode and generate stop condition, repeated start condition
 	i2c->I2CCNT = 1; //just one byte to read
 	i2c->I2CMDR = (I2C_I2CMDR_STT_BIT | I2C_I2CMDR_STP_BIT | I2C_I2CMDR_MST_BIT | I2C_I2CMDR_IRS_BIT | I2C_I2CMDR_FREE_BIT);
 
+	// wait for RRDY for transmission to complete or ARDY in case of NACK
+	while(!(i2c->I2CSTR & (I2C_I2CSTR_RRDY_BITS | I2C_I2CSTR_ARDY_BITS))){};
 	if(i2c->I2CSTR & I2C_I2CSTR_NACK_BITS) {
 		// generate STOP condition
 		i2c->I2CMDR |= I2C_I2CMDR_STP_BIT;
 		// clear NACK
-		i2c->I2CSTR |= I2C_I2CSTR_NACK_BITS;
+		i2c->I2CSTR = I2C_I2CSTR_NACK_BITS;
 		goto error;
 	}
 
@@ -1317,84 +1325,66 @@ extern uint16_t I2C_readData(I2C_Handle i2cHandle, uint16_t addr, uint16_t reg) 
 	//};
 
 	// busy wait on new data
-	//while(!(i2c->I2CSTR & I2C_I2CSTR_RRDY_BITS));
+	// !! this never seems to occur
+	//while((i2c->I2CSTR & I2C_I2CSTR_RRDY_BITS) == 0){};
 	return i2c->I2CDRR; // return read data;
 
 	error: {
 		// error condition
-		return 0xFF; // fix this
+		return 0xFF; // todo fix this
 	}
 
 }
 
-extern void I2C_readBytes(I2C_Handle i2cHandle, uint16_t addr, uint16_t reg, uint16_t num, uint16_t* data) {
+extern int I2C_readBytes(I2C_Handle i2cHandle, uint16_t slaveaddr, uint16_t* write_data, uint16_t write_len, uint16_t* read_data, uint16_t read_len) {
 	I2C_Obj *i2c = (I2C_Obj *)i2cHandle;
-	int count = 0;
-	// release hold on bus
-	// reset
-	i2c->I2CMDR |= I2C_I2CMDR_IRS_BIT;
+	int i;
+	/* Check for Bus Busy */
+	//while ((i2c->I2CSTR & I2C_I2CSTR_BB_BITS));
 
-	// busy wait on bus-busy
-	while(i2c->I2CSTR & I2C_I2CSTR_BB_BITS);
+	/* Disable I2C during configuration */
+	i2c->I2CMDR = 0;
 
-	// clear stop condition bit by writing to it
-	i2c->I2CSTR |= I2C_I2CSTR_SCD_BITS;
-	// wait on stop status to clear
-	while(i2c->I2CMDR & I2C_I2CMDR_STP_BIT);
+	/* Set the I2C controller to write len bytes */
+	i2c->I2CCNT = write_len;
+	i2c->I2CSAR = slaveaddr;
+	i2c->I2CMDR = (I2C_I2CMDR_IRS_BIT | I2C_I2CMDR_STT_BIT | I2C_I2CMDR_TRX_BIT | I2C_I2CMDR_MST_BIT | I2C_I2CMDR_FREE_BIT);
 
-	i2c->I2CSAR = addr;
+	/* Transmit data */
+	for (i = 0; i < write_len; i++) {
+		// Wait for "XRDY" flag to transmit data or "ARDY" if we get NACKed
+		while ( !(i2c->I2CSTR & (I2C_I2CSTR_XRDY_BITS | I2C_I2CSTR_ARDY_BITS)) );
 
-	// busy wait on bus-busy
-	//while(i2c->I2CSTR & I2C_I2CSTR_BB_BITS);
-
-	i2c->I2CCNT = 1; //just one byte to write
-	i2c->I2CDXR = reg;
-	i2c->I2CMDR = (I2C_I2CMDR_STT_BIT | I2C_I2CMDR_MST_BIT | I2C_I2CMDR_IRS_BIT | I2C_I2CMDR_TRX_BIT | I2C_I2CMDR_FREE_BIT);
-	// should write register on to bus in master write mode
-
-	// wait for XRDY for transmission to complete or ARDY in case of NACK
-	while(!(i2c->I2CSTR & (I2C_I2CSTR_XRDY_BITS | I2C_I2CSTR_ARDY_BITS)));
-
-	if(i2c->I2CSTR & I2C_I2CSTR_NACK_BITS) {
-		// generate STOP condition
-		i2c->I2CMDR |= I2C_I2CMDR_STP_BIT;
-		// clear NACK
-		i2c->I2CSTR |= I2C_I2CSTR_NACK_BITS;
-		goto error;
-	}
-	// change peripheral to master RX mode and generate stop condition
-
-	i2c->I2CCNT = num; //just many bytes
-	i2c->I2CMDR = (I2C_I2CMDR_STT_BIT | I2C_I2CMDR_STP_BIT | I2C_I2CMDR_MST_BIT | I2C_I2CMDR_IRS_BIT | I2C_I2CMDR_FREE_BIT);
-
-	for(count = 0; count < num; count++) {
-		// check for NACK
-		if(i2c->I2CSTR & I2C_I2CSTR_NACK_BITS) {
-			// generate STOP condition
-			i2c->I2CMDR |= I2C_I2CMDR_STP_BIT;
-			// clear NACK
-			i2c->I2CSTR |= I2C_I2CSTR_NACK_BITS;
-			goto error;
+		// If a NACK occurred then SCL is held low and STP bit cleared
+		if (i2c->I2CSTR & I2C_I2CSTR_NACK_BITS) {
+			i2c->I2CMDR = 0;		// reset I2C so SCL isn't held low
+			return 1;
 		}
-		// busy wait on new data
-		while(!(i2c->I2CSTR & I2C_I2CSTR_RRDY_BITS));
-		// read new data from read register into data buffer
-		data[count] = i2c->I2CDRR;
-
+		i2c->I2CDXR = write_data[i];
 	}
 
+	// wait for ARDY before beginning the read phase of the transaction
+	while (!(i2c->I2CSTR & I2C_I2CSTR_ARDY_BITS) );
 
-	//generate a STOP condition
-	//i2c->I2CMDR |= I2C_I2CMDR_STP_BIT; // set STP on CNT=0
-	// wait for stop condition
-	//while(!(i2c->I2CSTR & I2C_I2CSTR_SCD_BITS)) {
-	//	i2c->I2CMDR |= I2C_I2CMDR_STP_BIT;
-	//};
+	/* Set the I2C controller to read len bytes */
+	i2c->I2CCNT = read_len;
+	i2c->I2CMDR = (I2C_I2CMDR_IRS_BIT | I2C_I2CMDR_STT_BIT | I2C_I2CMDR_STP_BIT | I2C_I2CMDR_MST_BIT | I2C_I2CMDR_FREE_BIT);
 
-	error: {
-		// error condition
-		return 0xFF; // fix this
+	/* Receive data */
+	for (i = 0; i < read_len; i++) {
+		// Wait for I2C to read data or or "ARDY" if we get NACKed
+		while(!(i2c->I2CSTR & (I2C_I2CSTR_RRDY_BITS | I2C_I2CSTR_ARDY_BITS)) );
+
+		// If a NACK occurred then SCL is held low and STP bit cleared
+		if (i2c->I2CSTR & I2C_I2CSTR_NACK_BITS) {
+			i2c->I2CMDR = 0;		// reset I2C so SCL isn't held low
+			return 1;
+		}
+		// Make sure that you got the RRDY signal
+		while(!(i2c->I2CSTR & I2C_I2CSTR_RRDY_BITS)) {};
+		read_data[i] = i2c->I2CDRR;
 	}
+	return 0;
 }
 
 

@@ -76,6 +76,23 @@
 // **************************************************************************
 // the defines
 
+//! \Proportional gain for platform velocity controller
+#define Kp_PLAT_VEL (-0.124)
+//! \Proportional gain for platform position controller
+#define Kp_PLAT_POS (10)
+
+#define CTRL_PLAT_VEL (0)
+#define CTRL_PLAT_POS (1)
+
+//! \brief Defines the number of controller clock ticks per trajectory clock tick
+//! \brief Relationship of controller clock rate to trajectory loop rate
+//! \brief Typically the same as the speed rate
+#define USER_NUM_CTRL_TICKS_PER_PLAT_CTRL_TICK	(40)   // 40 Typical to match PWM, ex: 20KHz controller & current loop, 500 Hz velocity/pos loop
+
+#define USER_NUM_CTRL_TICKS_PER_GYRO_UPDATE_TICK (100)  // 20 kHz / 100 = 200 Hz gyro data acquisition rate
+
+#define NUM_MAIN_TICKS_PER_GYRO_UPDATE (25)
+
 
 //! \brief Defines the number of main iterations before global variables are updated
 //!
@@ -369,12 +386,12 @@ void runSetTrigger(void);
 
 //! \brief     Updates the global motor variables 
 //! 
-void updateGlobalVariables_motor(CTRL_Handle handle, const uint_least8_t mtrNum);
+void updateGlobalVariables_motor(const uint_least8_t mtrNum);
 
 
 //! \brief     Updates the global variables 
 //! 
-void updateGlobalVariables(EST_Handle handle, const uint_least8_t mtrNum);
+void updateGlobalVariables(const uint_least8_t mtrNum);
 
 
 //! \brief     Updates version 1p6 of library

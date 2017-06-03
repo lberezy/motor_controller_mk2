@@ -171,7 +171,7 @@ extern "C" {
 //! \brief Defines the number of controller clock ticks per trajectory clock tick
 //! \brief Relationship of controller clock rate to trajectory loop rate
 //! \brief Typically the same as the speed rate
-#define USER_NUM_CTRL_TICKS_PER_TRAJ_TICK_M2   (15)   // 15 Typical to match PWM, ex: 10KHz controller & current loop, 1KHz speed loop, 1 KHz Trajectory
+#define USER_NUM_CTRL_TICKS_PER_TRAJ_TICK_M2   (15)   // 15 Typical to match PWM, ex: 15KHz controller & current loop, 1KHz speed loop, 1 KHz Trajectory
 
 
 //! \brief LIMITS

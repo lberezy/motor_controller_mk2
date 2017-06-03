@@ -139,7 +139,7 @@ void USER_setParamsMtr1(USER_Params *pUserParams)
 
   pUserParams->ctrlWaitTime[CTRL_State_Error]         = 0;
   pUserParams->ctrlWaitTime[CTRL_State_Idle]          = 0;
-  pUserParams->ctrlWaitTime[CTRL_State_OffLine]       = (uint_least32_t)( 5.0 * USER_CTRL_FREQ_Hz_M1);
+  pUserParams->ctrlWaitTime[CTRL_State_OffLine]       = (uint_least32_t)( 5.0 * USER_CTRL_FREQ_Hz_M1); // 5 seconds
 //  pUserParams->ctrlWaitTime[CTRL_State_OffLine]       = (uint_least32_t)( 250.0 * USER_CTRL_FREQ_Hz_M1);
 
   pUserParams->ctrlWaitTime[CTRL_State_OnLine]        = 0;
